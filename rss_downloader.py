@@ -6,7 +6,7 @@ import openai
 from pydub import AudioSegment
 from tqdm import tqdm
 from dotenv import load_dotenv
-import sys
+
 
 
 load_dotenv()
