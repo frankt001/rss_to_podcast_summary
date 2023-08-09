@@ -6,6 +6,8 @@ import openai
 from pydub import AudioSegment
 from tqdm import tqdm
 from dotenv import load_dotenv
+import sys
+
 
 load_dotenv()
 
@@ -19,29 +21,35 @@ def get_feed_url(apple_id):
         return data['results'][0]['feedUrl']
     else:
         return None
-
+    
 #Download podcast episode from feed URL
-def download_episode(feed_url, save_directory, episode_index=0, download=True):
+def download_episode(feed_url, save_directory, episode_title=None, download=True):
+
     response = requests.get(feed_url)
     root = ET.fromstring(response.content)
-
     items = root.findall('.//item')
+    
 
     if not items:
         print("No episodes found in the RSS feed.")
         return
 
-    if episode_index >= len(items):
-        print("Episode index out of range.")
+    # Find the episode with the given title
+    episode = None
+    for item in items:
+        if item.find('./title').text == episode_title:
+            episode = item
+            break
+
+    if episode is None:
+        print(f"Episode with title '{episode_title}' not found.")
         return
 
-    episode = items[episode_index]
-    episode_title = episode.find('./title').text
     episode_url = episode.find('./enclosure').attrib['url']
-    
+
     if not download:
         return None, episode_title
-    
+
     print(f"Downloading episode: {episode_title}")
 
     local_filename = os.path.join(save_directory, f"{episode_title}.mp3")
@@ -55,6 +63,7 @@ def download_episode(feed_url, save_directory, episode_index=0, download=True):
 
     print(f"Download complete: {local_filename}")
     return local_filename, episode_title
+
 
 #Split podcast episode into segments
 def split_audio(mp3_path, segment_duration_minutes=20):
@@ -140,17 +149,64 @@ def generate_final_summary(summary_text):
         messages=[
             {
                 "role": "system",
-                "content": "Imagine you have just completed recording an amazing podcast episode, and as the host of the podcast, you are now looking to create a captivating first-person narrative summary of your episode to share with your audience on social media. Weave the key takeaways and highlights of your episode into an engaging, informative, and succinct summary. Your goal is to entice your audience to listen to the full episode. Think about how you can turn the most important parts of your episode into a compelling and informative story that captures the essence of your podcast. Remember, the goal of your narrative summary is to get your audience excited about your podcast and make them eager to tune in."
+                "content": "Your name is PodMunchie Sensei. Imagine you have just completed recording an amazing podcast episode, and as the host of the podcast, you are now looking to create a captivating first-person narrative summary of your episode to share with your audience on social media. Weave the key takeaways and highlights of your episode into an engaging, informative, and succinct summary. Your goal is to entice your audience to listen to the full episode. Think about how you can turn the most important parts of your episode into a compelling and informative story that captures the essence of your podcast. Remember, the goal of your narrative summary is to get your audience excited about your podcast and make them eager to tune in."
             },
             {
                 "role": "user",
-                "content": f"So, let your creativity shine and craft a first-person narrative summary that is as captivating as your episode itself! Please Also follow the rules below: - Give more content, less fluff, and no need for buzz words. - Ensure to give lots of details. - The summary should be around the topics. - The length of the summary should be at least 800 words: {summary_text}"
+                "content": f"So, let your creativity shine and craft a first-person narrative summary that is as captivating as your episode itself! Please Also follow the rules below: - Give more content, no fluff, and no need for buzz words. - Ensure to pack the summary with solid content and information that the listeners can learn from. - Say greeting first. - Mention in the begining this is a summary - The summary should be around the topics. - The length of the summary should be at least 800 words: {summary_text}"
             },
         ],
         temperature=0.6,
     )
 
     return response.choices[0].message.content.strip()
+
+def show_note_summary(show_notes):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that summarizes text."
+            },
+            {
+                "role": "user",
+                "content": f"Summarize the transcript in a clear and concise manner that. Chapters should be meaningful length and not too short. To format your markdown file, follow this structure: # [Descriptive Title]  <overview of the video> - Use bullet points to provide a detailed description of key points and insights. Title for the topic - Use bullet points to provide a detailed description of key points and insights. Repeat the above structure as necessary, and use subheadings to organize your notes. Formatting Tips: * Do not make the chapters too short, ensure that each section has at least 3-5 bullet points * Use bullet points to describe important steps and insights, being as comprehensive as possible. Summary Tips: * Use only content from the transcript. Do not add any additional information. * Make a new line after and before each bullet point {show_notes}"
+            },
+        ],
+        temperature=0.6,
+    )
+
+    return response.choices[0].message.content.strip()
+
+# Text to speech
+def text_to_speech(text, output_file):
+    CHUNK_SIZE = 1024
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/dMN8k2GAFbI3WcyDZwiu"
+
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": '270f30c2d01d4529066bb6b97802b2df'
+    }
+
+    data = {
+        "text": text,
+        "voice_settings": {
+            "stability": 0.75,
+            "similarity_boost": 0.75
+        }
+    }
+
+    response = requests.post(url, json=data, headers=headers)
+
+    with open(output_file, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            if chunk:
+                f.write(chunk)
+
+    print(f"Text-to-speech saved to: {output_file}")
+
 
 
 if __name__ == "__main__":
@@ -168,25 +224,28 @@ if __name__ == "__main__":
     # Get the RSS feed URL
     feed_url = get_feed_url(apple_id)
 
-    # Set the episode index you want to download. 0 for the latest episode, 1 for the previous one, and so on.
-    episode_index = int(os.environ["EPISODE_INDEX"])
+    print(feed_url)
+
+    # Get the episode title that you want to summarize
+    episode_title = os.environ["EPISODE_TITLE"]
 
     # Download the episode
-    _, episode_title = download_episode(feed_url, save_directory, episode_index, download=False)
+    _, episode_title = download_episode(feed_url, save_directory, episode_title, download=False)
 
     # Define the file paths
     mp3_path = os.path.join(save_directory, f"{episode_title}.mp3")
     transcript_path = os.path.join(save_directory, f"transcript_{episode_title}.txt")
     topics_path = os.path.join(save_directory, f"topics_{episode_title}.txt")
     final_summary_path = os.path.join(save_directory, f"final_summary_{episode_title}.txt")
+    show_note_path = os.path.join(save_directory, f"show_note_{episode_title}.txt")
 
     # Download the episode
     if not os.path.exists(mp3_path):
-        local_filename, episode_title = download_episode(feed_url, save_directory, episode_index, download=True)
+        local_filename, episode_title = download_episode(feed_url, save_directory, episode_title, download=True)
     else:
         print(f"MP3 file already exists: {mp3_path}")
         local_filename = mp3_path
-
+        
     # Split the episode into 20-minute segments
     segments = split_audio(local_filename)
 
@@ -204,7 +263,7 @@ if __name__ == "__main__":
     # Concatenate the transcripts
     full_transcript = "\n\n".join(transcripts)
 
-    # Summarize the transcript
+    # Summarize the transcript into bullet points
     if not os.path.exists(topics_path):
         summarized_bullet_points = summarize_large_text(full_transcript)
         print("Bullet Points Created.")
@@ -215,6 +274,7 @@ if __name__ == "__main__":
     else:
         print(f"Bullet Points file already exists: {topics_path}")
 
+    # Summarize the bullet points into final first person summary
     if not os.path.exists(final_summary_path):
         with open(topics_path, "r") as f:
             summary_text = f.read()
@@ -226,3 +286,17 @@ if __name__ == "__main__":
         print("Final summary saved.")
     else:
         print(f"Final summary file already exists: {final_summary_path}")
+
+
+    # Read the final summary text
+    with open(final_summary_path, 'r') as f:
+        final_summary_text = f.read()
+
+    # Read the final summary text
+    with open(final_summary_path, 'r') as f:
+        final_summary_text = f.read()
+        
+    # Convert the final summary text to speech and save it as an MP3 file
+    tts_output_path = os.path.join(save_directory, f"tts_final_summary_{episode_title}.mp3")
+    print("Text-to-speech conversion in progress...")
+    text_to_speech(final_summary_text, tts_output_path)
