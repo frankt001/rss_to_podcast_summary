@@ -1,5 +1,6 @@
+requests
+xml.etree.ElementTree
 openai
 pydub
 tqdm
 python-dotenv
-requests

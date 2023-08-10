@@ -106,6 +106,7 @@ def save_transcripts(transcripts, save_directory, filename):
             f.write(transcript)
             f.write("\n\n")
 
+#Split text into chunks
 def split_text_into_chunks(text, max_tokens=4090):
     chunks = []
     while len(text) > 0:
@@ -118,6 +119,7 @@ def split_text_into_chunks(text, max_tokens=4090):
     print(f"Text split into {len(chunks)} chunks.")
     return chunks
 
+#Summarize text into bullet points
 def summarize_chunk(chunk):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -130,6 +132,7 @@ def summarize_chunk(chunk):
     summary = response.choices[0].message.content.strip()
     return summary
 
+#Summarize large text
 def summarize_large_text(text):
     max_tokens = 4090  # Reserve tokens for instructions and conversation context
     chunks = split_text_into_chunks(text, max_tokens)
@@ -143,13 +146,14 @@ def summarize_large_text(text):
     print("Summaries aggregated.")
     return ' '.join(summaries)
 
+#Generate final summary
 def generate_final_summary(summary_text):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
             {
                 "role": "system",
-                "content": "Your name is PodMunchie Sensei. Imagine you have just completed recording an amazing podcast episode, and as the host of the podcast, you are now looking to create a captivating first-person narrative summary of your episode to share with your audience on social media. Weave the key takeaways and highlights of your episode into an engaging, informative, and succinct summary. Your goal is to entice your audience to listen to the full episode. Think about how you can turn the most important parts of your episode into a compelling and informative story that captures the essence of your podcast. Remember, the goal of your narrative summary is to get your audience excited about your podcast and make them eager to tune in."
+                "content": "Imagine you have just completed recording an amazing podcast episode, and you are now looking to create a captivating summary of your episode to share with your audience on social media. Weave the key takeaways and highlights of your episode into an engaging, informative, and succinct summary. Your goal is to entice your audience to listen to the full episode. Think about how you can turn the most important parts of your episode into a compelling and informative story that captures the essence of your podcast. Remember, the goal of your narrative summary is to get your audience excited about your podcast and make them eager to tune in."
             },
             {
                 "role": "user",
@@ -161,6 +165,7 @@ def generate_final_summary(summary_text):
 
     return response.choices[0].message.content.strip()
 
+#Show note summary
 def show_note_summary(show_notes):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -181,13 +186,14 @@ def show_note_summary(show_notes):
 
 # Text to speech
 def text_to_speech(text, output_file):
+    xi_api_key = os.getenv('XI_API_KEY')
     CHUNK_SIZE = 1024
     url = f"https://api.elevenlabs.io/v1/text-to-speech/dMN8k2GAFbI3WcyDZwiu"
 
     headers = {
         "Accept": "audio/mpeg",
         "Content-Type": "application/json",
-        "xi-api-key": '270f30c2d01d4529066bb6b97802b2df'
+        "xi-api-key": xi_api_key
     }
 
     data = {
@@ -278,8 +284,9 @@ if __name__ == "__main__":
     if not os.path.exists(final_summary_path):
         with open(topics_path, "r") as f:
             summary_text = f.read()
+        
+        print("Generating Final summary.")
         final_summary = generate_final_summary(summary_text)
-        print("Final summary generated.")
 
         with open(final_summary_path, "w") as outfile:
             outfile.write(final_summary)
@@ -287,16 +294,17 @@ if __name__ == "__main__":
     else:
         print(f"Final summary file already exists: {final_summary_path}")
 
-
     # Read the final summary text
     with open(final_summary_path, 'r') as f:
         final_summary_text = f.read()
 
-    # Read the final summary text
-    with open(final_summary_path, 'r') as f:
-        final_summary_text = f.read()
-        
+    
+
     # Convert the final summary text to speech and save it as an MP3 file
-    tts_output_path = os.path.join(save_directory, f"tts_final_summary_{episode_title}.mp3")
+
+    # Uncomment the following lines to enable text-to-speech👇
+    '''
+    ts_output_path = os.path.join(save_directory, f"tts_final_summary_{episode_title}.mp3")
     print("Text-to-speech conversion in progress...")
     text_to_speech(final_summary_text, tts_output_path)
+    '''

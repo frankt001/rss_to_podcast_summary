@@ -18,7 +18,8 @@ Before running the script, you need to set the required variables in the .env fi
 
 - OPENAI_API_KEY: Your OpenAI API key. Sign up for an account at OpenAI and obtain the API key from the OpenAI dashboard.
 - APPLE_PODCAST_URL: The Apple Podcast URL of the podcast you want to analyze. To obtain the Apple Podcast URL, go to the Apple Podcasts website or the iTunes Store, search for the podcast, and copy the URL from the address bar or the "Share" button.
-- EPISODE_INDEX: The index represents which episode you want to download in the podcast feed. It's 0 for the latest episode, 1 for the previous one, and so on. Set the value in the .env file.
+- EPISODE_TITLE: Input the title of the specific podcast you want to summarize. This can be copy pasted directly from your podcast
+- XI_API_KEY: Your ElevenLabs API key. Sign up for an account at ElevenLabs and obtain the API key from the ElevenLabs dashboard.
 
 ## Running the script
 In your terminal or command line, navigate to the folder where the script is located and run the script:
